@@ -2,8 +2,6 @@
 
 ## Начало работы
 
-Подключение кэша не обязательно
-
 ### Инициализация через конекты
 
 ```php
@@ -19,6 +17,7 @@ Data::init([
             'charset'  => 'utf8'
         ]
     ],
+    // Подключение кэша не обязательно
     'cache' => [
         // Драйвер (доступны: memcached, memcache, redis в будущих версиях)
         'driver' => 'memcached',
@@ -37,11 +36,11 @@ Data::init([
 Data::init([
     'db' => [
         'driver' => 'pdo',
-        'bind' => $pdo
+        'bind'   => $pdo
     ],
     'cache' => [
         'driver' => 'memcache',
-        'bind' => $memcache
+        'bind'   => $memcache
     ]
 ]);
 ```
@@ -69,4 +68,89 @@ Data::init([
         ...
     ]
 ]);
+```
+
+## SELECT
+
+### Выбор одной строки
+
+```php
+// Самый короткий способ, по её id
+$row = Base::$db->select('table', 1);
+
+// Массивом, равенство через and
+$row = Base::$db->select('table', [
+   'id' => 1,
+   'login' => $login
+]);
+
+// Более сложная логика
+$row = Base::$db->select('table', 'id = 1 or login = :login', [
+   'login' => $login
+]);
+
+// Запросом с дополнительными параметрами
+$row = Base::$db->getRow(
+    'SELECT 
+      * 
+    FROM 
+      `table` 
+    WHERE 
+      `type` = :type 
+      AND `level` > :level 
+    LIMIT 
+      1', 
+    [
+       'type' => $type
+       'level/int' => 10,
+    ]
+);
+```
+
+### Получение значения
+
+```php
+$count = Base::$db->getValue(
+    'SELECT 
+      COUNT(*) 
+    FROM 
+      `table` 
+    WHERE 
+      `level` > :level', 
+    [
+       'level' => 10,
+    ]
+);
+```
+
+### Получение списка
+
+```php
+$list = Base::$db->getList(
+    'SELECT 
+      * 
+    FROM 
+      `table` 
+    WHERE 
+      `level` > :level', 
+    [
+       'level' => 10,
+    ]
+);
+
+// Выполняется 2 запроса
+// Первый получает общее количество строк (переделывает запрос)
+// Второй сами данные (базовый запрос)
+// На выходе массив ['count' => 10, 'items' => [...]]
+$data = Base::$db->getListWithCount(
+    'SELECT 
+      * 
+    FROM 
+      `table` 
+    WHERE 
+      `level` > :level', 
+    [
+       'level' => 10,
+    ]
+);
 ```
