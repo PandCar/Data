@@ -10,12 +10,12 @@
 Data::init([
     'db' => [
         // Драйвер (pdo, mysqli, mysql)
-        'driver' => 'mysql',
+        'driver' => 'mysqli',
         'connect' => [
             'host'     => 'localhost',
             'user'     => 'Login',
             'password' => '12345',
-            'namedb'   => 'site-db',
+            'dbname'   => 'site-db',
             'charset'  => 'utf8'
         ]
     ],
