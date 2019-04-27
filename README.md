@@ -2,12 +2,14 @@
 
 ## Начало работы
 
+Подключение кэша не обязательно
+
 ### Инициализация через конекты
 
 ```php
 Data::init([
     'db' => [
-        // Драйвер (доступны: pdo, mysqli, mysql)
+        // Драйвер (pdo, mysqli, mysql)
         'driver' => 'mysql',
         'connect' => [
             'host'     => 'localhost',
@@ -17,9 +19,8 @@ Data::init([
             'charset'  => 'utf8'
         ]
     ],
-    // Подключение кэша не обязательно
     'cache' => [
-        // Драйвер (доступны: memcached, memcache, redis в будущих версиях)
+        // Драйвер (memcached, memcache, redis в будущих версиях)
         'driver' => 'memcached',
         'connect' => [
             'servers' => [
@@ -70,27 +71,29 @@ Data::init([
 ]);
 ```
 
-## SELECT
+## Работа с базой данных
+
+Подготовленными запросами можно работать как именованными переменными так и нет (через знак "?")
 
 ### Выбор одной строки
 
 ```php
 // Самый короткий способ, по её id
-$row = Base::$db->select('table', 1);
+$row = Data::$db->select('table', 1);
 
 // Массивом, равенство через and
-$row = Base::$db->select('table', [
+$row = Data::$db->select('table', [
    'id' => 1,
    'login' => $login
 ]);
 
 // Более сложная логика
-$row = Base::$db->select('table', 'id = 1 or login = :login', [
+$row = Data::$db->select('table', 'id = 1 or login = :login', [
    'login' => $login
 ]);
 
 // Запросом с дополнительными параметрами
-$row = Base::$db->getRow(
+$row = Data::$db->getRow(
     'SELECT 
       * 
     FROM 
@@ -110,7 +113,7 @@ $row = Base::$db->getRow(
 ### Получение значения
 
 ```php
-$count = Base::$db->getValue(
+$count = Data::$db->getValue(
     'SELECT 
       COUNT(*) 
     FROM 
@@ -126,7 +129,7 @@ $count = Base::$db->getValue(
 ### Получение списка
 
 ```php
-$list = Base::$db->getList(
+$list = Data::$db->getList(
     'SELECT 
       * 
     FROM 
@@ -142,7 +145,7 @@ $list = Base::$db->getList(
 // Первый получает общее количество строк (переделывает запрос)
 // Второй сами данные (базовый запрос)
 // На выходе массив ['count' => 10, 'items' => [...]]
-$data = Base::$db->getListWithCount(
+$data = Data::$db->getListWithCount(
     'SELECT 
       * 
     FROM 
@@ -154,3 +157,159 @@ $data = Base::$db->getListWithCount(
     ]
 );
 ```
+
+### Обновление 
+
+```php
+// Короткий способ, там где id = 5
+$bool = Data::$db->update('table', 5, [
+    'email' => $new_email,
+    'pass'  => $new_pass
+]);
+
+// Другие условия
+$bool = Data::$db->update('table', [
+    'login' => $login
+], [
+    'email' => $new_email,
+    'pass' => $new_pass
+]);
+
+// Запросом
+$bool = Data::$db->exec(
+    'UPDATE 
+      `table` 
+    SET 
+      `email` = :email, 
+      `pass` = :pass 
+    WHERE 
+      `login` = :login', 
+    [
+        'email' => $new_email,
+        'pass'  => $new_pass,
+        'login' => $login
+    ]
+);
+```
+
+### Добавление
+
+```php
+// Короткий способ
+$insert_id = Data::$db->insert('table', [
+    'login' => $login,
+    'pass'  => $pass,
+    'email' => $email
+]);
+
+// Запросом
+$bool = Data::$db->exec(
+    'INSERT INTO 
+      `table` (
+        `login`, `pass`, `email`
+      ) 
+    VALUES 
+      (:login, :pass, :email)', 
+    [
+        'login' => $login,
+        'pass' => $pass,
+        'email' => $email
+    ]
+);
+
+if ($bool) {
+    $insert_id = Data::$db->getInsertID();
+}
+
+``` 
+
+### Удаление
+
+```php
+// Тот же способ выбора как и у select...
+// Короткий способ, там где id = 5
+$bool = Base::remove('table', 'level > :level', [
+   'level' => $level
+]);
+
+// Запросом
+$bool = Data::$db->exec(
+    'DELETE FROM 
+      `table` 
+    WHERE 
+      `level` > :level', 
+    [
+        'level' => $level
+    ]
+);
+```
+
+## Работа с кэшем
+
+### Базовый функционал
+
+```php
+// Запись
+$bool = Data::$cache->set($key, $value, $exp, $en_json);
+
+// Чтение
+$value = Data::$cache->get($key, $un_json, $extended_info);
+
+// Удаление
+$bool = Data::$cache->del($key);
+```
+
+### Версии
+
+Используются для сброса большого количества ключей с параметрами
+
+```php
+$key = [$version_key, $key, [$param1, $param2]];
+
+// Запись
+$bool = Data::$cache->set($key, $value, $exp, $en_json);
+```
+
+### Кэш запросов к базе
+
+```php
+// По обычному ключу
+$list = Data::$db->getList(
+    'SELECT 
+      * 
+    FROM 
+      `table` 
+    WHERE 
+      `level` > :level', 
+    [
+       'level/int' => $level,
+    ],
+    [
+        'debug' => true,
+        'cache' => true,
+        'cache_key' => 'get_level_more_'.$level,
+        // Необязательный параметр, по умолчанию 3 часа
+        'cache_sec' => 3600
+    ]
+);
+
+// По ключу с версией
+$list = Data::$db->getList(
+    'SELECT 
+      * 
+    FROM 
+      `table` 
+    WHERE 
+      `level` > :level', 
+    [
+       'level/int' => $level,
+    ],
+    [
+        'debug' => true,
+        'cache' => true,
+        'cache_key' => [$version_key, 'get_level_more', [$level]],
+    ]
+);
+```
+
+

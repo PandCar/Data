@@ -1131,7 +1131,7 @@ class _DataUsingDB
     /**
      * @return mixed
      */
-    public function getInsertId()
+    public function getInsertID()
     {
         return $this->driverDB->insertId();
     }
@@ -1243,7 +1243,7 @@ class _DataUsingDB
             return false;
         }
         
-        return $this->getInsertId();
+        return $this->getInsertID();
     }
 
     /**
@@ -1266,8 +1266,8 @@ class _DataUsingDB
                 return false;
             }
             
-            if (empty($opt['cache_time'])) {
-                $opt['cache_time'] = 3600 * 3;
+            if (empty($opt['cache_sec'])) {
+                $opt['cache_sec'] = 3600 * 3;
             }
             
             $this->usingCache->keyVersionInit($opt['cache_key']);
@@ -1287,7 +1287,7 @@ class _DataUsingDB
                     'items' => $opt['cache_key'].'_items_'.$num,
                 ];
                 
-                $this->usingCache->set($opt['cache_key'], $keys, $opt['cache_time'], true);
+                $this->usingCache->set($opt['cache_key'], $keys, $opt['cache_sec'], true);
             }
         }
         
@@ -1402,8 +1402,8 @@ class _DataUsingDB
                 return false;
             }
             
-            if (empty($opt['cache_time'])) {
-                $opt['cache_time'] = 3600 * 3;
+            if (empty($opt['cache_sec'])) {
+                $opt['cache_sec'] = 3600 * 3;
             }
             
             $this->usingCache->keyVersionInit($opt['cache_key']);
@@ -1440,7 +1440,7 @@ class _DataUsingDB
         
         if (! empty($opt['cache']) && $this->usingCache)
         {
-            $this->usingCache->set($opt['cache_key'], $result, $opt['cache_time'], $json);
+            $this->usingCache->set($opt['cache_key'], $result, $opt['cache_sec'], $json);
         }
         
         return $result;
