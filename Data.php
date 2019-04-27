@@ -19,7 +19,14 @@ class Data
     public static $db,
         $cache;
     
-    protected static $set = [],
+    protected static $debug = false,
+		$throw_exception = false,
+		$app_cache = false,
+		$cache_sec = 10800,
+		$report_replace = [
+            '_DataUsingDB'    => 'Data::$db',
+            '_DataUsingCache' => 'Data::$cache',
+        ],
         $drivers_db = [
             'pdo'    => '_DataDBDriverPDO',
             'mysqli' => '_DataDBDriverMySQLi',
@@ -41,23 +48,15 @@ class Data
                 $opt => $value
             ];
         }
-        
-        if (isset($opt['debug'])) {
-            _DataReport::$show = ! empty($opt['debug']);
-        }
-        
-        if (isset($opt['throw_exception'])) {
-            _DataReport::$throwException = ! empty($opt['throw_exception']);
-        }
-        
-        if (isset($opt['app_cache']))
-        {
-            if (! empty(self::$cache)) {
-                self::$cache->appCache = ! empty($opt['app_cache']);
-            } else {
-                self::$set['app_cache'] = ! empty($opt['app_cache']);
-            }
-        }
+		
+		$white = ['debug', 'throw_exception', 'app_cache', 'cache_sec'];
+		
+		foreach ($opt as $key => $value)
+		{
+			if (isset(self::${$key}) && in_array($key, $white)) {
+				self::${$key} = $value;
+			}
+		}
     }
 
     /**
@@ -107,11 +106,6 @@ class Data
                 }
                 
                 self::$cache = new _DataUsingCache($cache);
-                
-                if (isset(self::$set['app_cache'])) {
-                    self::$cache->appCache = self::$set['app_cache'];
-                    unset(self::$set['app_cache']);
-                }
             }
             
             if (! isset($opt['db']['driver'])) {
@@ -153,6 +147,19 @@ class Data
     }
 
     /**
+     * @param string $key
+     * @return mixed
+     */
+    public static function getSetting($key)
+    {
+        if (! isset(self::${$key})) {
+            return false;
+        }
+        
+        return self::${$key};
+    }
+
+    /**
      * @param $type
      * @param $driver
      * @return bool
@@ -172,23 +179,26 @@ class Data
  */
 class _DataReport
 {
-    public static $show = false,
-        $throwException = false;
-
+	public static $db_last_error = '';
+	
     /**
      * @param $text
      * @param int $type
      * @param bool $forcibly
      * @throws DataException
      */
-    public static function view($text, $type = 1, $forcibly = false)
+    public static function view($text, $type = 1, $forcibly = false, $class = null)
     {
+		if ($class == '_DataUsingDB') {
+			self::$db_last_error = $type == 3 ? $text : '';
+		}
+		
         // Если это ошибка и включены исключения
-        if ($type == 3 && _DataReport::$throwException) {
+        if (Data::getSetting('throw_exception') && $type == 3) {
             throw new \DataException($text);
         }
         
-        if (! self::$show && ! $forcibly) {
+        if (! Data::getSetting('debug') && ! $forcibly) {
             return;
         }
         
@@ -212,10 +222,7 @@ class _DataReport
             $trace
         );
         
-        $replace = [
-            '_DataUsingDB'    => 'Data::$db',
-            '_DataUsingCache' => 'Data::$cache',
-        ];
+        $replace = Data::getSetting('report_replace');
         
         $trace = str_replace( array_keys($replace), array_values($replace), $trace);
         
@@ -1066,6 +1073,14 @@ class _DataUsingDB
     }
 
     /**
+     * @return string
+     */
+    public function lastError()
+    {
+		return _DataReport::$db_last_error;
+	}
+
+    /**
      * @param array $opt
      * @return bool
      * @throws DataException
@@ -1076,12 +1091,12 @@ class _DataUsingDB
         
         if ($this->driverDB->beginTransaction())
         {
-            _DataReport::view('Инициализация транзакции', 1, $debug);
+            _DataReport::view('Инициализация транзакции', 1, $debug, __CLASS__);
             
             return true;
         }
         
-        _DataReport::view('Ошибка при инициализации транзакции', 3, $debug);
+        _DataReport::view('Ошибка при инициализации транзакции', 3, $debug, __CLASS__);
         
         return false;
     }
@@ -1097,12 +1112,12 @@ class _DataUsingDB
         
         if ($this->driverDB->rollBack())
         {
-            _DataReport::view('Откат транзакции', 1, $debug);
+            _DataReport::view('Откат транзакции', 1, $debug, __CLASS__);
             
             return true;
         }
         
-        _DataReport::view('Ошибка при откате транзакции', 3, $debug);
+        _DataReport::view('Ошибка при откате транзакции', 3, $debug, __CLASS__);
         
         return false;
     }
@@ -1118,12 +1133,12 @@ class _DataUsingDB
         
         if ($this->driverDB->commit())
         {
-            _DataReport::view('Фиксация транзакции', 1, $debug);
+            _DataReport::view('Фиксация транзакции', 1, $debug, __CLASS__);
             
             return true;
         }
         
-        _DataReport::view('Ошибка при фиксации транзакции', 3, $debug);
+        _DataReport::view('Ошибка при фиксации транзакции', 3, $debug, __CLASS__);
         
         return false;
     }
@@ -1261,13 +1276,13 @@ class _DataUsingDB
         {
             if (empty($opt['cache_key']))
             {
-                _DataReport::view('Ключ кэша не передан', 3, $debug);
+                _DataReport::view('Ключ кэша не передан', 3, $debug, __CLASS__);
                 
                 return false;
             }
             
             if (empty($opt['cache_sec'])) {
-                $opt['cache_sec'] = 3600 * 3;
+                $opt['cache_sec'] = Data::getSetting('cache_sec');
             }
             
             $this->usingCache->keyVersionInit($opt['cache_key']);
@@ -1381,7 +1396,7 @@ class _DataUsingDB
             $param = [];
         }
         
-        if (_DataReport::$show || $debug)
+        if (Data::getSetting('debug') || $debug)
         {
             $param_info = [];
             
@@ -1397,13 +1412,13 @@ class _DataUsingDB
         {
             if (empty($opt['cache_key']))
             {
-                _DataReport::view($desc.'Ключ кэша не передан', 3, $debug);
+                _DataReport::view($desc.'Ключ кэша не передан', 3, $debug, __CLASS__);
                 
                 return false;
             }
             
             if (empty($opt['cache_sec'])) {
-                $opt['cache_sec'] = 3600 * 3;
+                $opt['cache_sec'] = Data::getSetting('cache_sec');
             }
             
             $this->usingCache->keyVersionInit($opt['cache_key']);
@@ -1412,7 +1427,7 @@ class _DataUsingDB
             
             if ($result['success'])
             {
-                _DataReport::view($desc.'Результат получен из кэша: '.$opt['cache_key'], 1, $debug);
+                _DataReport::view($desc.'Результат получен из кэша: '.$opt['cache_key'], 1, $debug, __CLASS__);
                 
                 return $result['data'];
             }
@@ -1425,11 +1440,11 @@ class _DataUsingDB
             
             $sec = microtime(true) - $start;
             
-            _DataReport::view($desc.'Время запроса: '.number_format($sec, 4, '.', '').' sec', ($sec > 0.3 ? 2 : 1), $debug);
+            _DataReport::view($desc.'Время запроса: '.number_format($sec, 4, '.', '').' sec', ($sec > 0.3 ? 2 : 1), $debug, __CLASS__);
         }
         catch (\DataException $e)
         {
-            _DataReport::view('Ошибка запроса: '.$e->getMessage()."\n".trim($desc), 3, $debug);
+            _DataReport::view('Ошибка запроса: '.$e->getMessage()."\n".trim($desc), 3, $debug, __CLASS__);
             
             return null;
         }
@@ -1452,8 +1467,6 @@ class _DataUsingDB
  */
 class _DataUsingCache
 {
-    public $appCache = false;
-    
     protected $driver,
         $data = [];
 
@@ -1476,13 +1489,13 @@ class _DataUsingCache
     {
         $this->keyVersionInit($key);
         
-        if ($this->appCache && isset($this->data[ $key ])) {
+        if (Data::getSetting('app_cache') && isset($this->data[ $key ])) {
             return $this->data[ $key ];
         }
         
         $value = $this->driver->get($key, $un_json, $extended_info);
         
-        if ($this->appCache) {
+        if (Data::getSetting('app_cache')) {
             $this->data[ $key ] = $value;
         }
         
@@ -1502,7 +1515,7 @@ class _DataUsingCache
         
         $result = $this->driver->set($key, $value, $exp, $en_json);
         
-        if ($this->appCache && $result) {
+        if (Data::getSetting('app_cache') && $result) {
             $this->data[ $key ] = $value;
         }
         
@@ -1519,7 +1532,7 @@ class _DataUsingCache
         
         $result = $this->driver->del($key);
         
-        if ($this->appCache && $result) {
+        if (Data::getSetting('app_cache') && $result) {
             unset($this->data[ $key ]);
         }
         
