@@ -20,10 +20,16 @@ class Data
         $cache;
     
     protected static $debug = false,
-		$throw_exception = false,
-		$app_cache = false,
-		$cache_sec = 10800,
-		$report_replace = [
+        $throw_exception = false,
+        $app_cache = false,
+        $cache_sec = 10800,
+        $set_white = [
+            'debug', 
+            'throw_exception', 
+            'app_cache', 
+            'cache_sec'
+        ],
+        $report_replace = [
             '_DataUsingDB'    => 'Data::$db',
             '_DataUsingCache' => 'Data::$cache',
         ],
@@ -48,15 +54,15 @@ class Data
                 $opt => $value
             ];
         }
-		
-		$white = ['debug', 'throw_exception', 'app_cache', 'cache_sec'];
-		
-		foreach ($opt as $key => $value)
-		{
-			if (isset(self::${$key}) && in_array($key, $white)) {
-				self::${$key} = $value;
-			}
-		}
+        
+        $white = self::getSetting('set_white');
+        
+        foreach ($opt as $key => $value)
+        {
+            if (isset(self::${$key}) && in_array($key, $white)) {
+                self::${$key} = $value;
+            }
+        }
     }
 
     /**
@@ -138,12 +144,20 @@ class Data
         }
         catch (\DataException $e)
         {
-            _DataReport::view('Ошибка при инициализации Data: '.$e->getMessage(), 3, $debug);
+            _DataReport::view('Ошибка инициализации: '.$e->getMessage(), 3, $debug);
             
             return false;
         }
         
         return true;
+    }
+    
+    /**
+     * @return string
+     */
+    public static function lastError()
+    {
+        return _DataReport::$last_error;
     }
 
     /**
@@ -179,20 +193,27 @@ class Data
  */
 class _DataReport
 {
-	public static $db_last_error = '';
-	
+    public static $last_error = '';
+    
     /**
-     * @param $text
-     * @param int $type
-     * @param bool $forcibly
+     * return null
+     */
+    public static function call($error = '')
+    {
+        self::$last_error = trim($error);
+    }
+    
+    /**
+     * @param string $text
+     * @param int    $type
+     * @param bool   $forcibly
+     * @return null
      * @throws DataException
      */
-    public static function view($text, $type = 1, $forcibly = false, $class = null)
+    public static function view($text, $type = 1, $forcibly = false)
     {
-		if ($class == '_DataUsingDB') {
-			self::$db_last_error = $type == 3 ? $text : '';
-		}
-		
+        self::$last_error = $type == 3 ? trim($text) : '';
+        
         // Если это ошибка и включены исключения
         if (Data::getSetting('throw_exception') && $type == 3) {
             throw new \DataException($text);
@@ -1073,14 +1094,6 @@ class _DataUsingDB
     }
 
     /**
-     * @return string
-     */
-    public function lastError()
-    {
-		return _DataReport::$db_last_error;
-	}
-
-    /**
      * @param array $opt
      * @return bool
      * @throws DataException
@@ -1091,12 +1104,12 @@ class _DataUsingDB
         
         if ($this->driverDB->beginTransaction())
         {
-            _DataReport::view('Инициализация транзакции', 1, $debug, __CLASS__);
+            _DataReport::view('Инициализация транзакции', 1, $debug);
             
             return true;
         }
         
-        _DataReport::view('Ошибка при инициализации транзакции', 3, $debug, __CLASS__);
+        _DataReport::view('Ошибка при инициализации транзакции', 3, $debug);
         
         return false;
     }
@@ -1112,12 +1125,12 @@ class _DataUsingDB
         
         if ($this->driverDB->rollBack())
         {
-            _DataReport::view('Откат транзакции', 1, $debug, __CLASS__);
+            _DataReport::view('Откат транзакции', 1, $debug);
             
             return true;
         }
         
-        _DataReport::view('Ошибка при откате транзакции', 3, $debug, __CLASS__);
+        _DataReport::view('Ошибка при откате транзакции', 3, $debug);
         
         return false;
     }
@@ -1133,12 +1146,12 @@ class _DataUsingDB
         
         if ($this->driverDB->commit())
         {
-            _DataReport::view('Фиксация транзакции', 1, $debug, __CLASS__);
+            _DataReport::view('Фиксация транзакции', 1, $debug);
             
             return true;
         }
         
-        _DataReport::view('Ошибка при фиксации транзакции', 3, $debug, __CLASS__);
+        _DataReport::view('Ошибка при фиксации транзакции', 3, $debug);
         
         return false;
     }
@@ -1148,6 +1161,8 @@ class _DataUsingDB
      */
     public function getInsertID()
     {
+        _DataReport::call();
+        
         return $this->driverDB->insertId();
     }
     
@@ -1276,7 +1291,7 @@ class _DataUsingDB
         {
             if (empty($opt['cache_key']))
             {
-                _DataReport::view('Ключ кэша не передан', 3, $debug, __CLASS__);
+                _DataReport::view('Ключ кэша не передан', 3, $debug);
                 
                 return false;
             }
@@ -1307,6 +1322,7 @@ class _DataUsingDB
         }
         
         $count_sql = _DataHelpers::extractCountSQL($sql);
+        $error = [];
         
         if (isset($keys)) {
             $opt['cache_key'] = $keys['count'];
@@ -1314,11 +1330,17 @@ class _DataUsingDB
         
         $count = $this->getValue($count_sql, $param, $opt);
         
+        $error []= _DataReport::$last_error;
+        
         if (isset($keys)) {
             $opt['cache_key'] = $keys['items'];
         }
         
         $items = $this->getList($sql, $param, $opt);
+        
+        $error []= _DataReport::$last_error;
+        
+        _DataReport::call( implode("\n", $error) );
         
         return [
             'count' => $count,
@@ -1412,7 +1434,7 @@ class _DataUsingDB
         {
             if (empty($opt['cache_key']))
             {
-                _DataReport::view($desc.'Ключ кэша не передан', 3, $debug, __CLASS__);
+                _DataReport::view($desc.'Ключ кэша не передан', 3, $debug);
                 
                 return false;
             }
@@ -1427,7 +1449,7 @@ class _DataUsingDB
             
             if ($result['success'])
             {
-                _DataReport::view($desc.'Результат получен из кэша: '.$opt['cache_key'], 1, $debug, __CLASS__);
+                _DataReport::view($desc.'Результат получен из кэша: '.$opt['cache_key'], 1, $debug);
                 
                 return $result['data'];
             }
@@ -1440,11 +1462,11 @@ class _DataUsingDB
             
             $sec = microtime(true) - $start;
             
-            _DataReport::view($desc.'Время запроса: '.number_format($sec, 4, '.', '').' sec', ($sec > 0.3 ? 2 : 1), $debug, __CLASS__);
+            _DataReport::view($desc.'Время запроса: '.number_format($sec, 4, '.', '').' sec', ($sec > 0.3 ? 2 : 1), $debug);
         }
         catch (\DataException $e)
         {
-            _DataReport::view('Ошибка запроса: '.$e->getMessage()."\n".trim($desc), 3, $debug, __CLASS__);
+            _DataReport::view('Ошибка запроса: '.$e->getMessage()."\n".trim($desc), 3, $debug);
             
             return null;
         }
@@ -1487,6 +1509,8 @@ class _DataUsingCache
      */
     public function get($key, $un_json = false, $extended_info = false)
     {
+        _DataReport::call();
+        
         $this->keyVersionInit($key);
         
         if (Data::getSetting('app_cache') && isset($this->data[ $key ])) {
@@ -1511,6 +1535,8 @@ class _DataUsingCache
      */
     public function set($key, $value, $exp = 0, $en_json = false)
     {
+        _DataReport::call();
+        
         $this->keyVersionInit($key);
         
         $result = $this->driver->set($key, $value, $exp, $en_json);
@@ -1528,6 +1554,8 @@ class _DataUsingCache
      */
     public function del($key)
     {
+        _DataReport::call();
+        
         $this->keyVersionInit($key);
         
         $result = $this->driver->del($key);
@@ -1547,6 +1575,8 @@ class _DataUsingCache
      */
     public function getKeyWithVersion($version, $key, $param)
     {
+        _DataReport::call();
+        
         if (! $num = $this->driver->get($version))
         {
             $num = _DataHelpers::timeRand();
@@ -1568,6 +1598,8 @@ class _DataUsingCache
      */
     public function keyVersionInit(&$key)
     {
+        _DataReport::call();
+        
         if (is_array($key)) {
             $key = $this->getKeyWithVersion($key[0], $key[1], ! empty($key[2]) ? $key[2] : []);
         }

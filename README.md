@@ -7,7 +7,7 @@
 ### Инициализация через конекты
 
 ```php
-Data::init([
+$result = Data::init([
     'db' => [
         // Драйвер (pdo, mysqli, mysql)
         'driver' => 'mysqli',
@@ -29,12 +29,16 @@ Data::init([
         ]
     ]
 ]);
+
+if (! $result) {
+    die( Data::lastError() );
+}
 ```
 
 ### Через присоединение к существующим конектам
 
 ```php
-Data::init([
+$result = Data::init([
     'db' => [
         'driver' => 'pdo',
         'bind'   => $pdo
@@ -44,6 +48,10 @@ Data::init([
         'bind'   => $memcache
     ]
 ]);
+
+if (! $result) {
+    die( Data::lastError() );
+}
 ```
 
 ### Настройки
@@ -73,15 +81,15 @@ Data::init([
 ]);
 ```
 
+### Последняя ошибка
+
+```php
+$string = Data::lastError();
+```
+
 ## Работа с базой данных
 
 Подготовленными запросами можно работать как именованными переменными так и нет (через знак "?")
-
-### Последняя ошибка бд
-
-```php
-$string = Data::$db->lastError();
-```
 
 ### Выбор одной строки
 
