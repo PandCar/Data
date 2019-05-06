@@ -1409,7 +1409,7 @@ class _DataUsingDB
      * @return mixed
      * @throws DataException
      */
-    protected function queryLayer($sql, $param, $opt, $json, $callback)
+    protected function queryLayer($sql, $param, $opt, $json = false, $callback = null)
     {
         $debug = ! empty($opt['debug']);
         $desc = '';
