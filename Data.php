@@ -3,13 +3,13 @@
 /**
  * @author Oleg Isaev (PandCar)
  * @contacts vk.com/id50416641, t.me/pandcar, github.com/pandcar
- * @version 1.0.0
+ * @version 1.1.1
  */
 
 /**
  * Class DataException
  */
-class DataException extends Exception { }
+class DataException extends \Exception { }
 
 /**
  * Class Data
@@ -27,7 +27,7 @@ class Data
             'debug', 
             'throw_exception', 
             'app_cache', 
-            'cache_sec'
+            'cache_sec',
         ],
         $report_replace = [
             '_DataUsingDB'    => 'Data::$db',
@@ -36,11 +36,12 @@ class Data
         $drivers_db = [
             'pdo'    => '_DataDBDriverPDO',
             'mysqli' => '_DataDBDriverMySQLi',
-            'mysql'  => '_DataDBDriverMySQL'
+            'mysql'  => '_DataDBDriverMySQL',
         ],
         $drivers_cache = [
             'memcached' => '_DataCacheDriverMemcached',
-            'memcache'  => '_DataCacheDriverMemcache'
+            'memcache'  => '_DataCacheDriverMemcache',
+            'files'     => '_DataCacheDriverFiles',
         ];
 
     /**
@@ -103,6 +104,10 @@ class Data
                 }
                 elseif (isset($opt['cache']['bind']))
                 {
+					if (! $cache->isAccessBind($opt['cache']['bind'])) {
+						throw new \DataException('Зависимость не валидна или запрет на присоединение');
+					}
+					
                     $cache->connect = $opt['cache']['bind'];
                     
                     _DataReport::view('Привязались к кэшу через '.$opt['cache']['driver'], 1, $debug);
@@ -871,6 +876,12 @@ class _DataDBDriverMySQL implements _DataDBDriver
 interface _DataCacheDriver
 {
     /**
+     * @param  mixed $bind
+     * @return bool
+     */
+    public function isAccessBind($bind);
+	
+    /**
      * @param $param
      * @return mixed
      */
@@ -906,6 +917,15 @@ interface _DataCacheDriver
 class _DataCacheDriverMemcached implements _DataCacheDriver
 {
     public $connect;
+	
+    /**
+     * @param  mixed $bind
+     * @return bool
+     */
+    public function isAccessBind($bind)
+    {
+		return true;
+	}
 
     /**
      * @param $param
@@ -993,6 +1013,15 @@ class _DataCacheDriverMemcached implements _DataCacheDriver
 class _DataCacheDriverMemcache implements _DataCacheDriver
 {
     public $connect;
+	
+    /**
+     * @param  mixed $bind
+     * @return bool
+     */
+    public function isAccessBind($bind)
+    {
+		return true;
+	}
 
     /**
      * @param array $param
@@ -1072,6 +1101,138 @@ class _DataCacheDriverMemcache implements _DataCacheDriver
     {
         return $this->connect->delete($key);
     }
+}
+
+/**
+ * Class _DataCacheDriverFiles
+ */
+class _DataCacheDriverFiles  implements _DataCacheDriver
+{
+    public $connect;
+	
+    /**
+     * @param  mixed $bind
+     * @return bool
+     */
+    public function isAccessBind($bind)
+    {
+		return false;
+	}
+
+    /**
+     * @param  array   $param
+     * @return string  Path
+     * @throws DataException
+     */
+    public function connect($param)
+    {
+        if (empty($param['path'])) {
+            throw new \DataException('Не передан путь к папке кэша');
+        }
+		
+        if (! file_exists($param['path'])) {
+            throw new \DataException('Директория не найдена');
+        }
+        
+        return $param['path'];
+    }
+
+    /**
+     * @param string       $key
+     * @param string|array $value
+     * @param int          $exp
+     * @param bool         $en_json
+     * @return mixed
+     */
+    public function set($key, $value, $exp = 0, $en_json = false)
+    {
+		$data = [
+			'time' => time() + $exp,
+			'val'  => $value,
+		];
+		
+		$res = file_put_contents(
+			$this->getPath($key),
+			json_encode($data, JSON_UNESCAPED_UNICODE),
+			LOCK_EX
+		);
+		
+		return ! empty($res);
+    }
+
+    /**
+     * @param string $key
+     * @param bool   $un_json
+     * @param bool   $extended_info
+     * @return array|bool
+     */
+    public function get($key, $un_json = false, $extended_info = false)
+    {
+		$path = $this->getPath($key);
+		
+		if (file_exists($path))
+		{
+			$content = file_get_contents($path);
+			
+			if (! empty($content))
+			{
+				$data = json_decode($content, true);
+				
+				if ($data['time'] >= time())
+				{
+					return $extended_info 
+						? ['success' => true, 'data' => $data['val']] 
+						: $data['val'];
+				}
+			}
+		}
+		
+        return $extended_info 
+            ? ['success' => false, 'data' => false] 
+            : false;
+    }
+
+    /**
+     * @param string $key
+     * @return mixed
+     */
+    public function del($key)
+    {
+		$path = $this->getPath($key);
+		
+		if (! file_exists($path)) {
+			return true;
+		}
+		
+        return unlink($path);
+    }
+	
+	/**
+	 * @param $key
+	 * @return string
+	 */
+	protected function getPath($key)
+	{
+		return $this->connect.'/'.$this->shardingPath($key).'/'.$key.'.txt';
+	}
+	
+	/**
+	 * Шардинг путей
+	 *
+	 * @param $str
+	 * @return string
+	 */
+	protected function shardingPath($str)
+	{
+		$hash = md5($str);
+		
+		$patch = [
+			substr($hash, -4, 2),
+			substr($hash, -2),
+		];
+
+		return implode('/', $patch);
+	}
 }
 
 /**

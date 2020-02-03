@@ -91,6 +91,16 @@ $string = Data::lastError();
 
 Подготовленными запросами можно работать как именованными переменными так и нет (через знак "?")
 
+### Транзакции
+
+```php
+Data::$db->beginTransaction();
+
+Data::$db->rollBack();
+
+Data::$db->commit();
+```
+
 ### Выбор одной строки
 
 ```php
@@ -244,7 +254,7 @@ if ($bool) {
 ```php
 // Тот же способ выбора как и у select...
 // Короткий способ, там где id = 5
-$bool = Base::remove('table', 'level > :level', [
+$bool = Data::$db->remove('table', 'level > :level', [
    'level' => $level
 ]);
 
