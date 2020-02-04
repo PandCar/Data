@@ -9,7 +9,7 @@
 ```php
 $result = Data::init([
     'db' => [
-        /*
+        /**
          * Драйвер:
          *   - pdo
          *   - mysqli
@@ -25,7 +25,7 @@ $result = Data::init([
         ]
     ],
     'cache' => [
-        /*
+        /**
          * Драйвер:
          *   - memcached
          *   - memcache
