@@ -104,10 +104,10 @@ class Data
                 }
                 elseif (isset($opt['cache']['bind']))
                 {
-					if (! $cache->isAccessBind($opt['cache']['bind'])) {
-						throw new \DataException('Зависимость не валидна или запрет на присоединение');
-					}
-					
+                    if (! $cache->isAccessBind($opt['cache']['bind'])) {
+                        throw new \DataException('Зависимость не валидна или запрет на присоединение');
+                    }
+                    
                     $cache->connect = $opt['cache']['bind'];
                     
                     _DataReport::view('Привязались к кэшу через '.$opt['cache']['driver'], 1, $debug);
@@ -880,7 +880,7 @@ interface _DataCacheDriver
      * @return bool
      */
     public function isAccessBind($bind);
-	
+    
     /**
      * @param $param
      * @return mixed
@@ -917,15 +917,15 @@ interface _DataCacheDriver
 class _DataCacheDriverMemcached implements _DataCacheDriver
 {
     public $connect;
-	
+    
     /**
      * @param  mixed $bind
      * @return bool
      */
     public function isAccessBind($bind)
     {
-		return true;
-	}
+        return true;
+    }
 
     /**
      * @param $param
@@ -1013,15 +1013,15 @@ class _DataCacheDriverMemcached implements _DataCacheDriver
 class _DataCacheDriverMemcache implements _DataCacheDriver
 {
     public $connect;
-	
+    
     /**
      * @param  mixed $bind
      * @return bool
      */
     public function isAccessBind($bind)
     {
-		return true;
-	}
+        return true;
+    }
 
     /**
      * @param array $param
@@ -1109,15 +1109,15 @@ class _DataCacheDriverMemcache implements _DataCacheDriver
 class _DataCacheDriverFiles  implements _DataCacheDriver
 {
     public $connect;
-	
+    
     /**
      * @param  mixed $bind
      * @return bool
      */
     public function isAccessBind($bind)
     {
-		return false;
-	}
+        return false;
+    }
 
     /**
      * @param  array   $param
@@ -1129,7 +1129,7 @@ class _DataCacheDriverFiles  implements _DataCacheDriver
         if (empty($param['path'])) {
             throw new \DataException('Не передан путь к папке кэша');
         }
-		
+        
         if (! file_exists($param['path'])) {
             throw new \DataException('Директория не найдена');
         }
@@ -1146,18 +1146,18 @@ class _DataCacheDriverFiles  implements _DataCacheDriver
      */
     public function set($key, $value, $exp = 0, $en_json = false)
     {
-		$data = [
-			'time' => time() + $exp,
-			'val'  => $value,
-		];
-		
-		$res = file_put_contents(
-			$this->getPath($key),
-			json_encode($data, JSON_UNESCAPED_UNICODE),
-			LOCK_EX
-		);
-		
-		return ! empty($res);
+        $data = [
+            'time' => time() + $exp,
+            'val'  => $value,
+        ];
+        
+        $res = file_put_contents(
+            $this->getPath($key),
+            json_encode($data, JSON_UNESCAPED_UNICODE),
+            LOCK_EX
+        );
+        
+        return ! empty($res);
     }
 
     /**
@@ -1168,25 +1168,25 @@ class _DataCacheDriverFiles  implements _DataCacheDriver
      */
     public function get($key, $un_json = false, $extended_info = false)
     {
-		$path = $this->getPath($key);
-		
-		if (file_exists($path))
-		{
-			$content = file_get_contents($path);
-			
-			if (! empty($content))
-			{
-				$data = json_decode($content, true);
-				
-				if ($data['time'] >= time())
-				{
-					return $extended_info 
-						? ['success' => true, 'data' => $data['val']] 
-						: $data['val'];
-				}
-			}
-		}
-		
+        $path = $this->getPath($key);
+        
+        if (file_exists($path))
+        {
+            $content = file_get_contents($path);
+            
+            if (! empty($content))
+            {
+                $data = json_decode($content, true);
+                
+                if ($data['time'] >= time())
+                {
+                    return $extended_info 
+                        ? ['success' => true, 'data' => $data['val']] 
+                        : $data['val'];
+                }
+            }
+        }
+        
         return $extended_info 
             ? ['success' => false, 'data' => false] 
             : false;
@@ -1198,41 +1198,41 @@ class _DataCacheDriverFiles  implements _DataCacheDriver
      */
     public function del($key)
     {
-		$path = $this->getPath($key);
-		
-		if (! file_exists($path)) {
-			return true;
-		}
-		
+        $path = $this->getPath($key);
+        
+        if (! file_exists($path)) {
+            return true;
+        }
+        
         return unlink($path);
     }
-	
-	/**
-	 * @param $key
-	 * @return string
-	 */
-	protected function getPath($key)
-	{
-		return $this->connect.'/'.$this->shardingPath($key).'/'.$key.'.txt';
-	}
-	
-	/**
-	 * Шардинг путей
-	 *
-	 * @param $str
-	 * @return string
-	 */
-	protected function shardingPath($str)
-	{
-		$hash = md5($str);
-		
-		$patch = [
-			substr($hash, -4, 2),
-			substr($hash, -2),
-		];
+    
+    /**
+     * @param $key
+     * @return string
+     */
+    protected function getPath($key)
+    {
+        return $this->connect.'/'.$this->shardingPath($key).'/'.$key.'.txt';
+    }
+    
+    /**
+     * Шардинг путей
+     *
+     * @param $str
+     * @return string
+     */
+    protected function shardingPath($str)
+    {
+        $hash = md5($str);
+        
+        $patch = [
+            substr($hash, -4, 2),
+            substr($hash, -2),
+        ];
 
-		return implode('/', $patch);
-	}
+        return implode('/', $patch);
+    }
 }
 
 /**

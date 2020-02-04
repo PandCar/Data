@@ -9,12 +9,12 @@
 ```php
 $result = Data::init([
     'db' => [
-		/*
+        /*
          * Драйвер:
-		 *   - pdo
-		 *   - mysqli
-		 *   - mysql
-		 */
+         *   - pdo
+         *   - mysqli
+         *   - mysql
+         */
         'driver' => 'mysqli',
         'connect' => [
             'host'     => 'localhost',
@@ -25,15 +25,15 @@ $result = Data::init([
         ]
     ],
     'cache' => [
-		/*
+        /*
          * Драйвер:
-		 *   - memcached
-		 *   - memcache
-		 *   - files (для корректной работы требуется прописать 
-		 *            в cron уборщик files_scavenger.php, в котором 
-		 *            в свою очередь указать директорию кэша)
-		 *   - redis (в будущих версиях)
-		 */
+         *   - memcached
+         *   - memcache
+         *   - files (для корректной работы требуется прописать 
+         *            в cron уборщик files_scavenger.php, в котором 
+         *            в свою очередь указать директорию кэша)
+         *   - redis (в будущих версиях)
+         */
         'driver' => 'memcached',
         'connect' => [
             'servers' => [
